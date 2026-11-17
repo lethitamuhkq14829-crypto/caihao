@@ -1,5 +1,3 @@
-"""Download and verify producer TerraClimate files on the full pipeline corridor."""
-
 from concurrent.futures import ThreadPoolExecutor
 from functools import partial
 import hashlib

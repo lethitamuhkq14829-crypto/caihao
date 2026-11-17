@@ -1,9 +1,5 @@
-// 中俄管道第二篇论文：建前土地覆盖与全走廊 DEM。
-// 整段复制到一个新的 Earth Engine Code Editor 脚本。
-// 走廊、UTM 投影和网格直接沿用 2013–2023 年 NDVI 导出。
 var CRS = 'EPSG:32652';
 var GRID = [30, 0, 0, 0, -30, 10000020];
-// Set CORRIDOR_ASSET to the primary 10 km corridor Earth Engine table asset.
 var CORRIDOR_ASSET = 'REPLACE_WITH_YOUR_ASSET_ID';
 if (CORRIDOR_ASSET.indexOf('REPLACE_') === 0) throw new Error('Set CORRIDOR_ASSET before running.');
 var EXPORT_BOUNDS_UTM = [291180, 5350590, 454320, 5726580];
@@ -17,8 +13,6 @@ var exportRegion = ee.Geometry.Rectangle(EXPORT_BOUNDS_UTM, CRS, false);
 var annualLandCover = ee.ImageCollection('projects/sat-io/open-datasets/GLC-FCS30D/annual')
   .filterBounds(exportRegion);
 
-// 2000 年是 b1，因此 2013 年是 b14，2014 年是 b15。
-// 原始分类编码保留，默认最近邻对齐。逐瓦片屏蔽填充值后再拼接。
 function landCoverForYear(year) {
   var band = 'b' + (year - 2000 + 1);
   return annualLandCover.select(band).map(function (tile) {

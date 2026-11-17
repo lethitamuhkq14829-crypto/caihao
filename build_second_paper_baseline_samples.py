@@ -1,8 +1,3 @@
-"""Task 3.1: build real baseline covariates and annual NDVI/NOBS sample shards.
-
-Run locally, not in the Earth Engine JavaScript editor. Does not perform matching.
-All raw inputs are read-only. Each CSV shard can later be matched by pixel_id.
-"""
 from pathlib import Path
 from contextlib import ExitStack
 import argparse,json,sys,hashlib
@@ -51,7 +46,6 @@ class NativePFR:
         return mean,rr.astype('int64')*len(self.lon)+cc,valid
 
 def slope_horn(dem,win):
-    """3x3 Horn slope, degrees, 30-m projected cells; reject all nodata halos."""
     pad=Window(win.col_off-1,win.row_off-1,win.width+2,win.height+2)
     a=dem.read(1,window=pad,boundless=True,fill_value=dem.nodata).astype('float64')
     a[(a==dem.nodata)|~np.isfinite(a)]=np.nan
@@ -65,11 +59,6 @@ def slope_horn(dem,win):
     return np.where(np.isfinite(result),result,-9999).astype('float32')
 
 def country_geometries(root,bounds):
-    """Actual polygon country checks, independent of nearest pipeline component.
-
-    China follows the user-provided national polygons; Russia is the existing
-    Natural Earth 5.1.1 technical reference. Overlaps/gaps stay flagged.
-    """
     area=box(bounds[0]-.5,bounds[1]-.5,bounds[2]+.5,bounds[3]+.5)
     china=root/'output/deliverables/User_Boundaries_SCS_20261107/01_Original/China/China_Provinces_Original.shp'
     world=root/'output/deliverables/China_Russia_GlobPermafrost_Processed/01_Original_Data/Boundaries_technical_reference/admin0/ne_10m_admin_0_countries.shp'
@@ -162,6 +151,6 @@ def run(args):
         print('DONE',output,'sample rows',sum(x['rows']for x in inventory),flush=True)
 
 if __name__=='__main__':
-    p=argparse.ArgumentParser(description=__doc__)
+    p=argparse.ArgumentParser(description='Task 3.1: build real baseline covariates and annual NDVI/NOBS sample shards.\n\nRun locally, not in the Earth Engine JavaScript editor. Does not perform matching.\nAll raw inputs are read-only. Each CSV shard can later be matched by pixel_id.\n')
     p.add_argument('--project',default=str(DEFAULT_PROJECT));p.add_argument('--source',default=str(DEFAULT_PROJECT / 'GEE_downloads'));p.add_argument('--output');p.add_argument('--check',action='store_true',help='validate inputs and sample PFR/slope; do not build the full library')
     run(p.parse_args())

@@ -1,4 +1,3 @@
-"""Baseline-only cross-country common support; frozen pairing before annual screening."""
 import numpy as np
 import pandas as pd
 from scipy.spatial import cKDTree
@@ -15,7 +14,6 @@ def cross_pair(f,t,c,pfr=False,strict=False):
         if len(ru)==0 or len(cn)==0:continue
         rv=ru[cov].to_numpy()/cal;cv=cn[cov].to_numpy()/cal
         opts=cKDTree(cv).query_ball_point(rv,1+1e-10,p=np.inf)
-        # Scarce-support targets first; tie broken by original pixel ID. No outcomes used.
         order=np.lexsort((ru.pixel_id.to_numpy(),np.array([len(o) for o in opts])))
         used=set();n=0
         for i in order:
@@ -78,7 +76,6 @@ def main():
         bc=np.array([.01,5.,1.]) if strict else CAL
         for v,cal in zip(COV+(['PFR_pre'] if usepfr else []),np.r_[bc,5. if strict else 10.] if usepfr else bc):assert np.max(np.abs(r[v]-ch[v]))<=cal+1e-6
         csv(table,name+'_pairs.csv.gz')
-        # Baseline balance and post-observation-filter balance separately.
         _,b=cross_stats(r,ch,name+'_baseline',reps=10);bal+=b
         rows,b=cross_stats(r[good],ch[good],name);results+=rows;bal+=b
         ret.append(dict(analysis=name,baseline_pairs=len(pair),complete_pairs=int(good.sum()),Russia_baseline_targets=int((annual.route=='Russia').sum()),China_baseline_targets=int((annual.route=='China').sum()),Russia_units_complete=r[good].unit.nunique(),China_units_complete=ch[good].unit.nunique()))

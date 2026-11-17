@@ -1,8 +1,3 @@
-"""Read archived matched samples; add common-support diagnostics without rematching.
-
-No new remote sensing data or spatial geometry is created. Existing outputs remain
-read-only. Bootstrap matches the manuscript's 10 km consecutive chainage blocks.
-"""
 from pathlib import Path
 import hashlib
 import json
@@ -108,7 +103,6 @@ def reference_checks():
     cb, cj = np.unique(c.unit.to_numpy() // BLOCK, return_inverse=True)
     W = np.zeros((len(rb),len(cb)))
     np.add.at(W,(ri,cj),w)
-    # Same exact cross-country pairs, weights and bootstrap draws for both references.
     V = np.column_stack([r.operation_base-c.operation_base,
                          r.operation_PFR-c.operation_PFR,
                          r.PFR_minus_base-c.PFR_minus_base])
@@ -132,7 +126,6 @@ def reference_checks():
     for j, name in enumerate(['contrast_base_refs','contrast_PFR_refs','PFR_minus_base']):
         pairs[name]=V[:,j]
     save(pairs,'fixed_country_pairs_detail.csv')
-    # Add raw components for the exact primary cohort already used in manuscript.
     raw=[]
     for route,g in b.groupby('route'):
         g=g.copy()

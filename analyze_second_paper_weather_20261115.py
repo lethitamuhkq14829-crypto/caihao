@@ -1,5 +1,3 @@
-"""Compare seasonal weather slopes of pipeline targets and matched references."""
-
 import calendar
 import json
 
@@ -44,7 +42,6 @@ def load_weather():
 
 
 def assign_cell(points, lon, lat):
-    # Native grid centres. Longitude increases eastward and latitude decreases southward.
     x, y = points.longitude.to_numpy(), points.latitude.to_numpy()
     half = 1 / 48
     outside = ((x < lon[0] - half) | (x > lon[-1] + half)
@@ -103,8 +100,6 @@ def cell_panel(data, weather, min_targets):
 
 
 def estimate(values, phase):
-    # With a balanced panel, subtract cell-by-period and year means and restore
-    # the period mean. A single period yields ordinary cell and year effects.
     demeaned = values.copy()
     for stage in np.unique(phase):
         mask = phase == stage

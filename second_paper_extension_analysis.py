@@ -1,6 +1,3 @@
-"""Complete non-overlapping distance gradients, PFR strata, segment sensitivity.
-Original completed outputs remain untouched. All new statistics are real-data results.
-"""
 from pathlib import Path
 import json
 import numpy as np
@@ -50,14 +47,13 @@ def distance_and_segments():
         a['operation']=a[[f'D_{y}' for y in range(2020,2024)]].mean(axis=1)
         for route,g in a.groupby('route'):ret.append(dict(analysis=name,route=route,matched=int((f.route.to_numpy()[t]==route).sum()),complete=len(g),units=g.unit.nunique()))
         g=a.groupby(['route','unit','type']).agg(n=('pixel_id','size'),operation=('operation','mean')).reset_index();g['analysis']=name;segs.append(g)
-        # Full annual target tables are unnecessary here: pairs + source rasters reconstruct them.
         annual=a.groupby(['route','unit','type']).agg(n=('pixel_id','size'),**{f'D_{y}':(f'D_{y}','mean') for y in core.YEARS}).reset_index()
         csv(annual,f'{name}_segment_annual.csv')
     for size in [500,1000,2000]:
         f['unit']=(f.chainage_m/size).astype(int)
         name=f'segment_{size}m';t,c=core.match(f,name)
         a=core.trajectories(f,t,c);keep=a.complete.to_numpy();balances+=weighted_balance(f,t[keep],c[keep],name)
-        a=a[keep].copy();a['unit']=a.unit*size/1000  # physical km start for spatial block IDs
+        a=a[keep].copy();a['unit']=a.unit*size/1000
         summaries+=core.block_summary(a,name)
         for route,g in a.groupby('route'):ret.append(dict(analysis=name,route=route,matched=int((f.route.to_numpy()[t]==route).sum()),complete=len(g),units=g.unit.nunique()))
     csv(pd.DataFrame(summaries),'extension_effects.csv');csv(pd.DataFrame(balances),'extension_balance.csv')
@@ -77,8 +73,6 @@ def pfr_analysis():
         for (country,typ),g in x.groupby(['route','type']):
             counts.append(dict(route=country,type=typ,PFR_group=layer,n=len(g),cells=g.PFR_cell_id.nunique(),units=g.unit.nunique(),blocks10=(g.unit//10).nunique(),NDVI_pre=g.NDVI_pre.mean(),elevation=g.elevation.mean(),slope=g.slope.mean()))
     csv(pd.DataFrame(allrows),'PFR_stratified_effects.csv');csv(pd.DataFrame(counts),'PFR_stratum_support.csv')
-    # Country contrast WITHIN PFR groups from the already frozen strict common-support pairs.
-    # Require both targets in the same PFR reporting stratum; do not infer country contrast from separate CIs.
     from second_paper_crosscountry import cross_stats
     pairs=pd.read_csv(PREV/'common_strict_PFR_pairs.csv.gz');pairs=pairs[pairs.complete]
     vals=a.set_index('pixel_id');r=vals.loc[pairs.Russia_target_id].reset_index();c=vals.loc[pairs.China_target_id].reset_index()
@@ -92,14 +86,12 @@ def pfr_analysis():
         results+=rr;bal+=bb
         sup.append(dict(PFR_group=layer,pairs=int(keep.sum()),Russia_cells=r[keep].PFR_cell_id.nunique(),China_cells=c[keep].PFR_cell_id.nunique()))
     csv(pd.DataFrame(results),'PFR_within_stratum_country_contrasts.csv');csv(pd.DataFrame(bal),'PFR_within_stratum_country_balance.csv');csv(pd.DataFrame(sup),'PFR_within_stratum_country_support.csv')
-    # Conditional association; not permafrost causation. Use <=50 range common to both sides.
     modelrows=[];coefrows=[];modeldata=[]
     for route in ['Russia','China']:
       for typ in ['All','Forest','Cropland']:
         x=a[(a.route==route)&(a.PFR_pre<=50)].copy()
         if typ!='All':x=x[x.type==typ]
         x['operation']=x[[f'D_{y}' for y in range(2020,2024)]].mean(axis=1)
-        # Aggregate shared cells/landcover/segment, and give represented units equal total weight.
         g=x.groupby(['unit','PFR_cell_id','lc2013']).agg(n=('pixel_id','size'),operation=('operation','mean'),PFR_pre=('PFR_pre','mean'),NDVI_pre=('NDVI_pre','mean'),elevation=('elevation','mean'),slope=('slope','mean'),latitude=('latitude','mean')).reset_index()
         g['weight']=g.n/g.groupby('unit').n.transform('sum');g['route']=route;g['type']=typ;modeldata.append(g)
         X=np.column_stack([np.ones(len(g)),g.PFR_pre/10,g.NDVI_pre/.1,g.elevation/100,g.slope/5,g.latitude-g.latitude.mean(),pd.get_dummies(g.lc2013,drop_first=True,dtype=float).to_numpy()])
@@ -112,9 +104,6 @@ def pfr_analysis():
         for j,col in enumerate(columns):coefrows.append(dict(route=route,type=typ,term=col,coefficient=beta[j]))
         for L in [5,10,20]:
             bid,inv=np.unique(g.unit.to_numpy()//L,return_inverse=True);rng=np.random.default_rng(20261109+L);boots=[]
-            # Absence of a rare land-cover dummy does not imply that the PFR slope
-            # is unidentified. Partial out land-cover intercepts within each draw.
-            # This is the weighted Frisch-Waugh-Lovell form of the same model.
             z=X[:,1:6];groups=g.lc2013.to_numpy()
             def slope_within_class(ww):
                 zz=z.copy();yy=y.copy()
@@ -134,7 +123,6 @@ def pfr_analysis():
             interval=np.quantile(boots,[.025,.975]) if len(boots)>=1800 else [np.nan,np.nan]
             modelrows.append(dict(route=route,type=typ,status='ok' if len(boots)>=1800 else 'bootstrap_rank_unstable',n=len(g),native_cells=g.PFR_cell_id.nunique(),units=g.unit.nunique(),blocks=len(bid),block_km=L,coefficient_PFR_per10pct=beta[1],ci_low=interval[0],ci_high=interval[1],valid_bootstraps=len(boots),weighted_R2=1-np.sum(w*res**2)/np.sum(w*(y-np.average(y,weights=w))**2)))
     csv(pd.DataFrame(modelrows),'PFR_conditional_association.csv');csv(pd.DataFrame(coefrows),'PFR_model_coefficients.csv');csv(pd.concat(modeldata),'PFR_model_input_cells.csv')
-    # Spatial autocorrelation of primary segment contrasts and low-frequency-detrended residuals.
     s=pd.read_csv(PREV/'base_segment_annual.csv');s['operation']=s[[f'D_{y}' for y in range(2020,2024)]].mean(axis=1)
     acf=[]
     for route,g in s.groupby('route'):

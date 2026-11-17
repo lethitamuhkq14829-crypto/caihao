@@ -1,4 +1,3 @@
-"""Validate the operation-period spatial gradient on identical Landsat footprints."""
 from pathlib import Path
 import json
 

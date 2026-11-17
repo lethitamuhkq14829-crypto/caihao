@@ -1,5 +1,3 @@
-"""Extract per-scene Landsat 8 NDVI at the original matched pixel centres."""
-
 import argparse
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import ExitStack
@@ -36,7 +34,6 @@ def catalog_item(record):
             or meta["landsat:collection_category"] != "T1"):
         raise ValueError(f"Catalog scene or date differs from original manifest: {item_id}")
     hrefs = [item["assets"][key]["href"] for key in ASSETS]
-    # Input archive tracks the exact product, including the processing timestamp.
     if not all(record.product_id + "_" in href for href in hrefs):
         raise ValueError(f"Processing version differs: {record.product_id}")
     return item_id, hrefs
@@ -72,7 +69,6 @@ def sample(hrefs, x, y):
             result = np.full(len(x), np.nan, np.float32)
             if not len(use):
                 return result
-            # Run reads by GDAL internal block, sharing HTTP ranges between points.
             bh, bw = main.block_shapes[0]
             ncol = (main.width + bw - 1) // bw
             blocks = (rr[use] // bh) * ncol + cc[use] // bw
@@ -112,7 +108,6 @@ def run_scene(args):
             print(f"{item_id} {np.isfinite(values).sum()} valid pixels", flush=True)
             return row.product_id
         except Exception as error:
-            # Some GDAL errors include signed URLs. Avoid printing credentials.
             print(f"{row.product_id} attempt {attempt + 1}: {type(error).__name__}", flush=True)
     return None
 

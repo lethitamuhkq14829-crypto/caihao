@@ -1,8 +1,3 @@
-// 补充任务 B：2010–2014 年 6–9 月 Landsat 7 NDVI/NOBS
-// 公开版本通过 Asset ID 读取管线和 2.1 km 缓冲区。原线 SHA256: 3cc5e6bc248214e39367b245587f6f19f6d683bf418995285e8b2054e9ba3909
-// Export footprint: archived line +/-2100 m in EPSG:32652; 2 m boundary simplification.
-// Display-only border connector is in the export footprint; excluded from later country analysis.
-// 每次只改 BATCH：从 1 开始依次跑完，不要重复运行同一批。
 var BATCH = 1;
 var BATCHES = [[2010, 2011], [2012, 2013], [2014]];
 if (BATCH < 1 || BATCH > BATCHES.length) throw new Error('BATCH 超出范围');
@@ -14,10 +9,8 @@ var START_MONTH = 6;
 var END_MONTH_EXCLUSIVE = 10;
 var CRS = 'EPSG:32652';
 var GRID = [30, 0, 0, 0, -30, 10000020];
-// Set PIPELINE_ASSET to the study alignment Earth Engine table asset.
 var PIPELINE_ASSET = 'REPLACE_WITH_YOUR_ASSET_ID';
 if (PIPELINE_ASSET.indexOf('REPLACE_') === 0) throw new Error('Set PIPELINE_ASSET before running.');
-// Set CORRIDOR_ASSET to the 2.1 km corridor Earth Engine table asset.
 var CORRIDOR_ASSET = 'REPLACE_WITH_YOUR_ASSET_ID';
 if (CORRIDOR_ASSET.indexOf('REPLACE_') === 0) throw new Error('Set CORRIDOR_ASSET before running.');
 var ROI = ee.FeatureCollection(CORRIDOR_ASSET).geometry(1);
@@ -50,13 +43,11 @@ YEARS.forEach(function(year) {
   var raw = ee.ImageCollection(COLLECTION).filterBounds(ROI)
     .filterDate(start, end).filter(ee.Filter.lt('CLOUD_COVER',70));
   var processed = raw.map(prepare);
-  // Fully masked placeholder preserves schema if no scenes; contributes NO observations.
   var empty = ee.Image.constant(0).rename('NDVI').toFloat()
     .updateMask(ee.Image.constant(0));
   var safe = processed.merge(ee.ImageCollection.fromImages([empty]));
   var ndvi = safe.median().rename('NDVI').toFloat().clip(ROI);
   var nobs = safe.count().rename('NOBS').unmask(0).toUint16().clip(ROI);
-  // Fill within ROI only; outside remains masked. NOBS=0 is valid, not missing.
   exportImage(ndvi.unmask(-9999).clip(ROI), 'CN_RU_'+TAG+'_NDVI_'+year+'_30m', -9999);
   exportImage(nobs, 'CN_RU_'+TAG+'_NOBS_'+year+'_30m', 65535);
   logs.push(ee.Feature(null, {

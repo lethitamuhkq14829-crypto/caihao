@@ -1,4 +1,3 @@
-"""Retrieve Sentinel-2 L2A windows and composite daily NDVI on Landsat-aligned grids."""
 from argparse import ArgumentParser
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -132,7 +131,6 @@ def calibration(item):
 
 
 def read_nearest(dataset, site):
-    """Exact nearest cell-centre sample on the shared EPSG:32652 grid."""
     a = dataset.transform
     assert dataset.crs.to_epsg()==32652 and a.b==a.d==0 and a.a in (10,20) and a.e==-a.a
     x = site.transform.c+10*(np.arange(site.width)+.5)
@@ -270,7 +268,6 @@ def composite(site, items, year):
             rgb_candidates.append((int(np.isfinite(r).sum()),it))
         a10.append(ndvi(red,nir))
         h,w=site.height//3,site.width//3
-        # Full 3x3 support keeps partial cloud gaps out of the 30 m comparison.
         def aggregate(band):
             return band.reshape(h,3,w,3).mean(axis=(1,3))
         a30.append(ndvi(aggregate(red),aggregate(nir)))

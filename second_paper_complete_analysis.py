@@ -1,7 +1,3 @@
-"""Auditable local baseline matching and longitudinal analysis. Raw files read-only.
-Run with python -X utf8 scripts/second_paper_complete_analysis.py
-All distances and chainages are in EPSG:32652. No outcome-dependent matching.
-"""
 from pathlib import Path
 from contextlib import ExitStack
 import json, hashlib, time
@@ -65,7 +61,6 @@ def build_inputs(max_target_m=131):
     files.update({f'NOBS_{y}':SOURCE/f'第一步/CN_RU_NOBS_{y}_30m.tif' for y in YEARS})
     files.update(lc2013=SOURCE/'第二步/CN_RU_GLC_FCS30D_2013_30m.tif',lc2014=SOURCE/'第二步/CN_RU_GLC_FCS30D_2014_30m.tif',elevation=SOURCE/'第二步/CN_RU_SRTM_DEM_30m.tif')
     frames=[];raw=0;gates=[]
-    # Covers every shifted 50-m target and 500-2000-m reference, plus nominal 100-m targets.
     roi=shapely.union_all([full.buffer(max_target_m+9,quad_segs=64),full.buffer(2040,quad_segs=64).difference(full.buffer(460,quad_segs=64))])
     with ExitStack() as stack:
         ds={k:stack.enter_context(rasterio.open(p)) for k,p in files.items()};base=ds[NC[0]]
@@ -185,7 +180,6 @@ def trajectories(f,t,c,obsmin=1,end=2023):
     return frame
 
 def block_summary(frame,label,blocks=(5,10,20),reps=2000):
-    # Every target first contributes within its 1-km unit; units then have equal weights.
     outputs=[]
     for route in ['Russia','China']:
       for typ in ['All','Forest','Cropland','Other vegetation']:
@@ -231,23 +225,19 @@ def main():
             for th,end,n in [(3,2023,'NOBS3'),(1,2022,'end2022')]:
                 aa=trajectories(f,t,c,th,end);sel=aa.complete.to_numpy()
                 if end==2022:
-                    # 2023 values may be missing in this additional cohort. No 2023 or four-year operation estimate.
                     aa.loc[:,['D_2023']]=np.nan
                 results=block_summary(aa[sel],n)
                 if end==2022:results=[r for r in results if r['metric'] not in ['D_2023','operation','rebound_2023_minus_2019']]
                 summaries+=results;balances+=balance(f,t[sel],c[sel],n+'_complete')
                 for route in ['Russia','China']:
                     m=(aa.route==route)&sel;retention.append(dict(analysis=n,route=route,matched_baseline=int((aa.route==route).sum()),complete_targets=int(m.sum()),analysis_end_year=end,complete_units=aa[m].unit.nunique(),PFR_missing_targets=int(aa[m].PFR_pre.isna().sum())))
-            # Remove PFR-missing targets without modifying the existing base controls.
             summaries+=block_summary(complete[complete.PFR_pre.notna()],'base_PFRvalid_targets')
-    # Same target cohort: PFR-adjusted matching vs base matching; require complete members in both.
     base=pd.read_pickle(OUT/'base_annual_targets.pkl');pfr=pd.read_csv(OUT/'pairs/PFR_annual_targets.csv.gz')
     common=np.intersect1d(base.loc[base.complete,'pixel_id'],pfr.loc[pfr.complete,'pixel_id'])
     summaries+=block_summary(base[base.pixel_id.isin(common)],'base_same_PFR_cohort')
     summaries+=block_summary(pfr[pfr.pixel_id.isin(common)],'PFR_same_cohort')
     csv(pd.DataFrame(summaries),'effect_summaries.csv');csv(pd.DataFrame(balances),'balance.csv')
     csv(pd.DataFrame(retention),'retention.csv');csv(pd.DataFrame(coverage),'annual_coverage.csv')
-    # Before-matching descriptive balance among all nominal near/reference candidates, by country.
     rows=[]
     for route in ['Russia','China']:
       for typ in ['All','Forest','Cropland','Other vegetation']:

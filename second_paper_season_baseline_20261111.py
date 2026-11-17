@@ -1,4 +1,3 @@
-"""Audit downloaded tiles and compare seasons/early baseline on frozen pairs."""
 from pathlib import Path
 import json,re,zipfile,hashlib
 import numpy as np
@@ -162,7 +161,6 @@ def analyse(f):
             v['operation']=v[[f'D_{y}' for y in range(2020,end+1)]].mean(axis=1)
             results+=summarise(v,[f'D_{y}' for y in years]+['operation'],f'{branch}_JulAug_minus_JunSep_common_end{end}')
             csv(pd.DataFrame(dict(pixel_id=old.pixel_id,JunSep_complete=od,common_complete=common)),f'{branch}_cohort_end{end}.csv.gz')
-        # Fixed cross-country pair IDs, then the intersection of complete seasons in both countries.
         pp=pd.read_csv(PREV/f'common_strict_{branch}_pairs.csv.gz')
         a=seasonframes[(branch,'JunSep_common')].set_index('pixel_id',drop=False);b=seasonframes[(branch,'JulAug_common')].set_index('pixel_id',drop=False)
         sel=pp.Russia_target_id.isin(a.index)&pp.China_target_id.isin(a.index);pp=pp[sel]
@@ -173,7 +171,6 @@ def analyse(f):
         csv(pp,f'{branch}_crosscountry_season_common_pairs.csv.gz')
     csv(pd.DataFrame(results),'season_effects.csv');csv(pd.DataFrame(ret),'season_cohort_retention.csv');csv(pd.DataFrame(annualq),'annual_pair_observation_coverage.csv')
     csv(pd.DataFrame(crossrows),'season_crosscountry_effects.csv');csv(pd.DataFrame(crossbal),'season_crosscountry_balance.csv')
-    # L7-only early history on frozen baseline pairs. No L7-to-L8 stitching.
     allrows=[];keepcounts=[];sensorrows=[]
     for branch in ['base','PFR']:
         t,c=pairs(f,branch);a=frame(f,t,c,'L7_JunSep',list(range(2010,2015)));o=frame(f,t,c,'',list(range(2013,2024)))

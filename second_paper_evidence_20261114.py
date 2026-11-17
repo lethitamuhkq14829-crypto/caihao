@@ -1,4 +1,3 @@
-"""Audit archived Landsat inputs and reproduce additional manuscript analyses."""
 from pathlib import Path
 import json
 
@@ -42,7 +41,6 @@ def image_audit(pixels):
     np.testing.assert_array_equal(secondary.scenes, extra_log.set_index(["tag", "year"]).sort_index().scene_count)
     inventory = pd.concat([counts.reset_index(), secondary.reset_index().rename(columns={"tag": "series"})], ignore_index=True)
     save(inventory, "annual_scene_inventory.csv")
-    # Direct samples from the original GeoTIFFs, independently of the saved trajectories.
     samples = pd.concat([pixels[pixels.route == route].sample(24, random_state=SEED) for route in COUNTRIES])
     coordinates = list(zip(samples.x, samples.y))
     grid = None
@@ -195,7 +193,6 @@ def observation_sensitivity(cohort):
         for branch, expected in [("base", original.mean()), ("NOBS3", strict_units.mean())]:
             ref = archive.query("route == @country and analysis == @branch and type == 'All' and metric == 'operation' and block_km == 10")
             assert len(ref) == 1 and abs(ref.iloc[0]["mean"] - expected) < 1e-7
-        # Compare time windows first on identical targets, then check added coverage.
         for branch, metric in [("base", "operation"), ("base", "operation_2020_2022"), ("end2022", "operation_2020_2022")]:
             period.append(archive.query("route == @country and analysis == @branch and type == 'All' and metric == @metric and block_km == 10"))
     save(pd.concat(records, ignore_index=True), "observation_threshold_common_units.csv")

@@ -1,4 +1,3 @@
-"""Check the GEE export and summarize NDVI by route, distance and year."""
 from contextlib import ExitStack
 from hashlib import sha256
 from pathlib import Path
@@ -62,13 +61,10 @@ def get_geometry():
 
 
 def raster_regions(shape, affine, domain, buffers, parts, component_buffers, full):
-    """Label the nearest route component and distance band at pixel centers."""
     labels = rasterize(
         [(poly, i) for i, poly in reversed(list(enumerate(buffers, start=1)))],
         out_shape=shape, transform=affine, dtype="uint8",
     )
-    # Intersect the exported count mask with the local pixel-center mask.
-    # GEE may include edge pixels whose centers fall outside the polygon.
     rr, cc = np.nonzero(domain)
     xx, yy = affine * (cc + 0.5, rr + 0.5)
     inside = labels[rr, cc] > 0
@@ -77,8 +73,6 @@ def raster_regions(shape, affine, domain, buffers, parts, component_buffers, ful
         assert np.max(shapely.distance(full, outside)) <= 10000 + 30 * np.sqrt(2) / 2 + 1
     xx, yy = xx[inside], yy[inside]
     points = shapely.points(xx, yy)
-    # Compute exact nearest components for points that can belong to two
-    # 10-km buffers. Elsewhere, the one containing buffer suffices.
     candidates = np.vstack([shapely.contains_xy(poly, xx, yy) for poly in component_buffers])
     assert candidates.any(axis=0).all()
     group = candidates.argmax(axis=0)
@@ -90,8 +84,6 @@ def raster_regions(shape, affine, domain, buffers, parts, component_buffers, ful
 
 
 def get_segment_units(parts):
-    # Straight source edges provide an exact nearest-point projection without
-    # cutting or resampling the route itself.
     geometries, offsets, tree = [], [], []
     lengths = [int(np.ceil(p.length / 1000)) for p in parts]
     for line in parts:
@@ -119,7 +111,6 @@ def segment_ids(points, group, units):
 
 
 def analyze(source, digest, scenes, full, parts):
-    # A small north-to-south window avoids holding 22 full rasters in memory.
     band_count = len(BANDS)
     zones = len(SIDES) * band_count
     domain_total = np.zeros(zones, dtype=np.int64)
@@ -279,7 +270,7 @@ def plot(tables, out):
 
 
 def main():
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(description='Check the GEE export and summarize NDVI by route, distance and year.')
     parser.add_argument("--source", type=Path, default=Path.home() / "Desktop" / "NDVI")
     args = parser.parse_args()
     digest, scenes = verify_logs(args.source)

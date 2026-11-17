@@ -1,5 +1,3 @@
-"""Test the 2019–2023 component changes using identical dates in each matched set."""
-
 import argparse
 import json
 import warnings
@@ -57,7 +55,6 @@ def read_scene_matrices(pairs):
                        comparable_pixels=int(valid.sum()),
                        ndvi_median_absolute_difference=float(np.median(differences)),
                        ndvi_p95_absolute_difference=float(np.quantile(differences, .95))))
-        # Keep per-pixel medians with and without the shared-date screen.
         daily_members = np.stack(daily)[:, idx]
         shared = np.isfinite(daily_members).all(axis=2)
         dates_per_target[year] = shared.sum(axis=0)

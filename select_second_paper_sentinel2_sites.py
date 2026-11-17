@@ -1,4 +1,3 @@
-"""Freeze 12 validation windows using baseline land cover and chainage only."""
 from pathlib import Path
 import json
 

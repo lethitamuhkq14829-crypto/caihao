@@ -1,34 +1,20 @@
-/*
- * 中俄天然气管道第二篇论文：完整研究管线年度 NDVI
- * 生成日期：2026-11-05。仅限已确定的约 428.16 km 管段。
- * 管线含中方、俄方及连接段；公开版本通过 Asset ID 读取研究管线。
- * 本地已做语法和几何核对；尚未在用户 GEE 账户提交或完成导出。
- * 数据与参数依据：
- * https://developers.google.com/earth-engine/datasets/catalog/LANDSAT_LC08_C02_T1_L2
- * https://developers.google.com/earth-engine/apidocs/export-image-todrive
- * 不使用旧管线 Asset；本脚本不计算 50 m 影响范围或恢复结论。
- */
-
-// ================= 1. 只需先确认这几个参数 =================
-var RUN_ALL_YEARS = false;  // false：试跑2013和2023；true：全部2013—2023
+var RUN_ALL_YEARS = false;
 var TEST_YEARS = [2013, 2023];
 var START_YEAR = 2013;
 var END_YEAR = 2023;
 var START_MONTH = 6;
-var END_MONTH = 9;         // 包含9月，实际结束日期为10月1日（不含）
-var BUFFER_M = 10000;      // 两侧各10 km，仅数据获取范围，不是影响范围
-var SCENE_CLOUD_MAX = 70;  // 整景云量 <70%，同时仍执行逐像元QA掩膜
-var MIN_VALID_OBS = 1;     // 保留原始有效合成；后续结合NOBS筛选，勿把缺测当0
-var LOW_OBS_WARNING = 3;   // 仅用于地图提示，不删除导出数据
+var END_MONTH = 9;
+var BUFFER_M = 10000;
+var SCENE_CLOUD_MAX = 70;
+var MIN_VALID_OBS = 1;
+var LOW_OBS_WARNING = 3;
 var CRS = 'EPSG:32652';
-// 固定30m网格；所有年份相同。不要再在Export中加入scale或dimensions。
 var GRID = [30, 0, 0, 0, -30, 10000020];
 var TAG = RUN_ALL_YEARS ? 'ALL_2013_2023' : 'TEST';
 var DRIVE_FOLDER = 'CN_RU_NDVI_v1_20261105_' + TAG;
 var NDVI_NODATA = -9999;
-var COUNT_NODATA = 65535;  // NOBS中0=走廊内无有效观测，65535=走廊外NoData
+var COUNT_NODATA = 65535;
 
-// Set PIPELINE_ASSET to the study alignment Earth Engine table asset.
 var PIPELINE_ASSET = 'REPLACE_WITH_YOUR_ASSET_ID';
 if (PIPELINE_ASSET.indexOf('REPLACE_') === 0) throw new Error('Set PIPELINE_ASSET before running.');
 var projection = ee.Projection(CRS);
@@ -59,16 +45,12 @@ print('数据目录', DRIVE_FOLDER);
 print('固定输出投影 / 网格', CRS, GRID);
 print('注意：Count表示有效影像观测次数，不保证是互不重复的日期数。');
 
-// ================= 3. Landsat 8 表面反射率和逐景NDVI =================
 function sceneNDVI(image) {
-  // QA_PIXEL bits 0—5：填充值、膨胀云、卷云、云、云影、雪。
   var qaMask = image.select('QA_PIXEL').bitwiseAnd(63).eq(0);
   var radMask = image.select('QA_RADSAT').eq(0);
   var red = image.select('SR_B4').multiply(0.0000275).add(-0.2);
   var nir = image.select('SR_B5').multiply(0.0000275).add(-0.2);
   var denominator = nir.add(red);
-  // 显式剔除负反射率和零分母，与旧normalizedDifference的负输入屏蔽一致。
-  // 负NDVI本身不会被删除；不根据建后土地类型变化筛掉扰动像元。
   var valid = qaMask.and(radMask).and(red.gte(0)).and(nir.gte(0))
     .and(denominator.gt(0));
   var ndvi = nir.subtract(red).divide(denominator)
@@ -91,7 +73,6 @@ function exportRaster(image, name, noData) {
   });
 }
 
-// ================= 4. 年度合成及导出 =================
 var manifest = ee.FeatureCollection([]);
 var yearSummaries = [];
 var ndviVis = {min: -0.1, max: 0.85,
@@ -103,7 +84,6 @@ years.forEach(function(year) {
   var scenes = ee.ImageCollection('LANDSAT/LC08/C02/T1_L2')
     .filterBounds(corridor).filterDate(begin, end)
     .filter(ee.Filter.lt('CLOUD_COVER', SCENE_CLOUD_MAX));
-  // 完全掩膜的占位影像只保证空集合仍有NDVI波段，不增加任何有效值或计数。
   var empty = ee.Image.constant(0).rename('NDVI').toFloat()
     .updateMask(ee.Image.constant(0)).setDefaultProjection(exportProjection);
   var observations = scenes.map(sceneNDVI)
@@ -128,7 +108,6 @@ years.forEach(function(year) {
   Map.addLayer(nobs.lt(LOW_OBS_WARNING).selfMask(), {palette: ['ff00ff']},
     'Low observation coverage ' + year, false);
 
-  // ImageCollection.map必须返回Image，故此处先转List，再生成Feature。
   var rows = scenes.toList(scenes.size()).map(function(obj) {
     var image = ee.Image(obj);
     return ee.Feature(null, {
@@ -174,7 +153,6 @@ Export.table.toDrive({
     'min_valid_observations','qa_pixel_clear_bits','qa_radsat_rule','reflectance_rule',
     'scale_factor','offset','ndvi_nodata','nobs_nodata','pipeline_source_sha256']
 });
-// 最后添加管线，使其显示在NDVI图层之上。
 Map.addLayer(ee.FeatureCollection([ee.Feature(pipeline)]).style({
   color: 'ff0000', width: 2
 }), {}, 'Accepted complete pipeline');

@@ -1,4 +1,3 @@
-"""Recompute country-level NDVI estimates from the published 1 km unit tables."""
 from pathlib import Path
 
 import numpy as np
